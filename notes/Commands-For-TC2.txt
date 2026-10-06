@@ -1,0 +1,21 @@
+Commands-For-TC2
+
+# Python Virtual Environment
+
+sudo dnf install python -y
+python3 -m venv venv
+source venv/bin/activate
+
+python -m pip install --upgrade pip
+pip install -r requirementx.txt
+
+pip show Flask
+
+python3 hellocruelworld.py
+
+
+# Create Git repo and push to it 
+git init
+git branch -M main
+git remote add origin https://github.com/emvaugh2/Tech-Challenge-2.git
+
