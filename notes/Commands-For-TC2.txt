@@ -19,3 +19,223 @@ git init
 git branch -M main
 git remote add origin https://github.com/emvaugh2/Tech-Challenge-2.git
 
+
+# Packages to install on Jenkins server/mgmt jumpbox
+sudo dnf install -y git
+sudo dnf install -y docker
+sudo systemctl enable --now docker.server
+sudo systemctl status docker.server
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+curl -LO "https://dl.k8s.io/release/v1.35.0/bin/linux/amd64/kubectl"
+chmod +x kubectl
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+rm kubectl
+
+# Package verification checks
+aws --version
+kubectl version --client
+helm version
+docker --version
+git --version
+
+
+# AWS EKS Cluster and Node creation verification (swap out for your specific cluster and group name)
+aws eks describe-cluster \
+--name tc2-eks-cluster \
+--region us-east-1 \
+--query 'cluster.status' \
+--output text
+
+aws eks describe-nodegroup \
+--cluster-name tc2-eks-cluster \
+--nodegroup-name tc2-eks-group \
+--region us-east-1 \
+--query 'nodegroup.status' \
+--output text
+
+# Update AWS EKS Kubeconfig
+aws eks update-kubeconfig \
+--region us-east-1 \
+--name tc2-eks-cluster
+
+
+# Confirm the proper nodes and pods are created
+kubectl get nodes -o wide
+kubectl get pods -n kube-system
+
+# Installs Metrics server & verification commands
+kubectl apply -f \
+https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+kubectl rollout status \
+deployment/metrics-server \
+-n kube-system
+
+kubectl get deployment metrics-server -n kube-system
+
+
+####### Installs AWS Load Balancer & verification commands #######
+LBC_ROLE_ARN=$(aws iam get-role \
+--role-name tc2-aws-load-balancer-controller-role \
+--query 'Role.Arn' \
+--output text)
+
+kubectl create serviceaccount \
+aws-load-balancer-controller \
+--namespace kube-system
+
+kubectl annotate serviceaccount \
+aws-load-balancer-controller \
+--namespace kube-system \
+eks.amazonaws.com/role-arn="$LBC_ROLE_ARN"
+
+kubectl describe serviceaccount \
+aws-load-balancer-controller \
+--namespace kube-system
+
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update eks
+
+VPC_ID=$(aws eks describe-cluster \
+--name tc2-eks-cluster \
+--region us-east-1 \
+--query 'cluster.resourcesVpcConfig.vpcId' \
+--output text)
+
+helm install aws-load-balancer-controller \
+eks/aws-load-balancer-controller \
+--namespace kube-system \
+--set clusterName=tc2-eks-cluster \
+--set serviceAccount.create=false \
+--set serviceAccount.name=aws-load-balancer-controller \
+--set region=us-east-1 \
+--set vpcId="$VPC_ID" \
+--version 1.14.0
+
+kubectl rollout status \
+deployment/aws-load-balancer-controller \
+--namespace kube-system
+
+kubectl get deployment \
+aws-load-balancer-controller \
+--namespace kube-system
+
+kubectl get pods \
+--namespace kube-system \
+-l app.kubernetes.io/name=aws-load-balancer-controller
+
+helm list --namespace kube-system
+
+kubectl logs \
+--namespace kube-system \
+deployment/aws-load-balancer-controller \
+--tail=50
+
+
+
+
+######### Create and install the Cluster Autoscaler #########
+kubectl create serviceaccount \
+cluster-autoscaler \
+--namespace kube-system
+
+kubectl annotate serviceaccount \
+cluster-autoscaler \
+--namespace kube-system \
+eks.amazonaws.com/role-arn="$CLUSTER_AUTOSCALER_ROLE_ARN"
+
+kubectl get serviceaccount \
+cluster-autoscaler \
+--namespace kube-system \
+-o yaml
+
+helm repo add autoscaler https://kubernetes.github.io/autoscaler
+helm repo update autoscaler
+helm search repo autoscaler/cluster-autoscaler
+
+
+
+helm install cluster-autoscaler \
+autoscaler/cluster-autoscaler \
+--namespace kube-system \
+--set cloudProvider=aws \
+--set autoDiscovery.clusterName=tc2-eks-cluster \
+--set awsRegion=us-east-1 \
+--set rbac.serviceAccount.create=false \
+--set rbac.serviceAccount.name=cluster-autoscaler \
+--set extraArgs.balance-similar-node-groups=true \
+--set extraArgs.skip-nodes-with-system-pods=false
+
+kubectl get deployment \
+--namespace kube-system | grep autoscaler
+
+
+kubectl rollout status \
+deployment/cluster-autoscaler-aws-cluster-autoscaler \
+--namespace kube-system
+
+
+
+kubectl get pods \
+--namespace kube-system \ \ grep autoscaler
+
+helm list --namespace kube-system
+
+AUTOSCALER_DEPLOYMENT=$(kubectl get deployments \
+--namespace kube-system \
+-o name | grep cluster-autoscaler | head -1)
+
+kubectl logs \
+--namespace kube-system \
+"$AUTOSCALER_DEPLOYEMT" \
+--tail=50
+
+kubectl logs \
+--namespace kube-system \
+"$AUTOSCALER_DEPLOYMENT" \
+--tail=200 | grep -Ei "error|denied|failed|unauthorized"
+
+# Final check
+kubectl get nodes
+kubectl get deployments -n kube-system
+kubectl get pods -n kube-system
+kubectl top nodes
+kubectl top pods -A
+
+
+################################ Phase 4 #############################
+
+git clone https://github.com/emvaugh2/Tech-Challenge-2.git
+cd Tech-Challenge-2
+
+sudo docker build \
+-t hello-cruel-world:latest \
+./app
+
+ECR_REPOSITORY=$(aws ecr describe-repositories \
+--repository-names hello-cruel-world-repo \
+--region us-east-1 \
+--query 'repositories[0].repositoryUri' \
+--output text)
+
+ECR_REGISTRY="${ECR_REPOSITORY%/*}"
+
+aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+
+docker tag \
+hello-cruel-world:latest \
+"$ECR_REPOSITORY:latest"
+
+docker push "$ECR_REPOSITORY:latest"
+
+aws ecr describe-images \
+--repository-name hello-cruel-world-repo \
+--region us-east-1 \
+--query 'imageDetails[].imageTags' \
+--output table 
+``
+kubectl create namespace tc2
+
+# mkdir -p helm (do this in your Tech-Challenge-2 directory if you don't already have this folder)
+helm create helm/hello-cruel-world
