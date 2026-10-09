@@ -196,7 +196,7 @@ pipeline {
                     done
                     echo "Application response: $RESPONSE"
                     echo "$RESPONSE" |
-                        grep -F "Hello, (Cruel) World!"
+                        grep -F "Hello, (cruel) World!"
                 '''
             }
         }
