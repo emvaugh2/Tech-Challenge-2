@@ -48,7 +48,7 @@ pipeline {
                                 --output text)
                             printf '%s' "${ECR_REPOSITORY%/*}"
                         ''',
-*                       returnStdout: true
+                       returnStdout: true
                     ).trim()
                     env.FULL_IMAGE = "${env.ECR_REPOSITORY}:${env.IMAGE_TAG}"
                     env.KUBECONFIG = "${env.WORKSPACE}/.kube/config"
