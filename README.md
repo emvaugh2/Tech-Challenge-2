@@ -15,7 +15,7 @@ Lets create our custom namespace for this challenge. We'll name it `tc2`. Then, 
 
 Then I ran into an issue with the Charts.yaml file. Apparently Helm didn't like that we still had the NOTES.txt file. I removed it. There was so much troubleshooting after this. I don't even remember each part. We'll just have to go back over this section but we finally got it to work. 
 
-
+In order to push to my GitHub repo from my EC2 instance, I had to generate a fine-used token with the permissions of Content for Read & Write. That was also a quick headache. Had to side-step that. 
 
 Phase 3: EKS cluster setup and add-ons
 

@@ -6,7 +6,7 @@
 
 # Creates the IAM role for the EKS cluster
 resource "aws_iam_role" "eks_cluster_role" {
-  name = "eks_cluster_role"
+  name = "tc2-eks-cluster-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -33,18 +33,25 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
 # Creates the EKS Cluster (Control Plane) resource
 
 resource "aws_eks_cluster" "eks_cluster" {
-  name = var.cluster_name
+  name = "tc2-eks-cluster"
 
   access_config {
-    authentication_mode = "API"
+    authentication_mode                         = "API"
+    bootstrap_cluster_creator_admin_permissions = true
   }
 
   role_arn = aws_iam_role.eks_cluster_role.arn
   version  = "1.35"
 
   vpc_config {
-    subnet_ids = var.subnet_ids
+    subnet_ids = [aws_subnet.private_subnet_1.id,
+    aws_subnet.private_subnet_2.id]
+
+    endpoint_public_access  = true
+    endpoint_private_access = true
   }
+
+
 
   # Ensure that IAM Role permissions are created before and deleted
   # after EKS Cluster handling. Otherwise, EKS will not be able to
@@ -52,6 +59,10 @@ resource "aws_eks_cluster" "eks_cluster" {
   depends_on = [
     aws_iam_role_policy_attachment.eks_cluster_policy,
   ]
+
+  tags = {
+    Project = "Tech-Challenge-2"
+  }
 }
 
 
@@ -64,7 +75,7 @@ resource "aws_eks_cluster" "eks_cluster" {
 
 # Creates the IAM role for the EKS node group
 resource "aws_iam_role" "eks_node_group_role" {
-  name = "eks_node_group_role"
+  name = "tc2-eks-group-role"
 
   assume_role_policy = jsonencode({
     Statement = [{
@@ -100,15 +111,22 @@ resource "aws_iam_role_policy_attachment" "EC2ContainerRegistryReadOnly" {
 # Creates the EKS node group
 resource "aws_eks_node_group" "eks_node_group" {
   cluster_name    = aws_eks_cluster.eks_cluster.name
-  node_group_name = var.node_group_name
+  node_group_name = "tc2-eks-group"
   node_role_arn   = aws_iam_role.eks_node_group_role.arn
-  subnet_ids      = var.subnet_ids
-  instance_types  = [var.instance_type]
+  subnet_ids = [aws_subnet.private_subnet_1.id,
+  aws_subnet.private_subnet_2.id]
+  instance_types = ["t3.small"]
 
   scaling_config {
-    desired_size = 3
-    max_size     = 6
-    min_size     = 3
+    desired_size = 1
+    max_size     = 4
+    min_size     = 1
+  }
+
+  lifecycle {
+    ignore_changes = [
+      scaling_config[0].desired_size
+    ]
   }
 
   update_config {
@@ -122,25 +140,29 @@ resource "aws_eks_node_group" "eks_node_group" {
     aws_iam_role_policy_attachment.EKS_CNI_Policy,
     aws_iam_role_policy_attachment.EC2ContainerRegistryReadOnly,
   ]
+
+  tags = {
+    Project = "Tech-Challenge-2"
+  }
 }
 
 
-resource "aws_eks_access_entry" "mgmt_box" {
+resource "aws_eks_access_entry" "jenkins_box" {
   cluster_name  = aws_eks_cluster.eks_cluster.name
-  principal_arn = var.mgmt_role_arn
+  principal_arn = aws_iam_role.jenkins_role.arn
 
 }
 
-resource "aws_eks_access_policy_association" "eks_mgmt_box_policy_assoc" {
+resource "aws_eks_access_policy_association" "eks_jenkins_box_policy_assoc" {
   cluster_name  = aws_eks_cluster.eks_cluster.name
   policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-  principal_arn = var.mgmt_role_arn
+  principal_arn = aws_iam_role.jenkins_role.arn
 
   access_scope {
     type = "cluster"
   }
   depends_on = [
-    aws_eks_access_entry.mgmt_box
+    aws_eks_access_entry.jenkins_box
   ]
 
 }

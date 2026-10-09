@@ -1,49 +1,38 @@
-#Creates the frontend and backend repositories to store our images for our applications. 
+# Creates the Flask Hello Cruel World repository to store our images for our application. 
 
-resource "aws_ecr_repository" "frontend_repo" {
-  name                 = "frontend-repository"
+resource "aws_ecr_repository" "python_hcw" {
+  name                 = "hello-cruel-world-repo"
   image_tag_mutability = "MUTABLE"
+  force_delete         = true
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project = "Tech-Challenge-2"
   }
 }
 
-resource "aws_ecr_repository" "backend_repo" {
-  name                 = "backend-repository"
-  image_tag_mutability = "MUTABLE"
 
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  tags = {
-    Project = "Tech-Challenge-1"
-  }
-}
-
-# Creates the lifecyle policies  for the frontend and backend repositories. It says don't keep any images older than 14 days. 
+# Creates the lifecyle policy for our Flask Hello (Cruel) World repository. It says don't keep any images older than 5 days. 
 
 
 
-resource "aws_ecr_lifecycle_policy" "frontend_repo_lcp" {
-  repository = aws_ecr_repository.frontend_repo.name
+resource "aws_ecr_lifecycle_policy" "python_hcw_lcp" {
+  repository = aws_ecr_repository.python_hcw.name
 
   policy = <<EOF
 {
   "rules": [
     {
       "rulePriority": 1,
-      "description": "Expire images older than 14 days",
+      "description": "Expire untagged images older than 5 days",
       "selection": {
         "tagStatus": "untagged",
         "countType": "sinceImagePushed",
         "countUnit": "days",
-        "countNumber": 14
+        "countNumber": 5
       },
       "action": {
         "type": "expire"
@@ -54,26 +43,3 @@ resource "aws_ecr_lifecycle_policy" "frontend_repo_lcp" {
 EOF
 }
 
-resource "aws_ecr_lifecycle_policy" "backend_repo_lcp" {
-  repository = aws_ecr_repository.backend_repo.name
-
-  policy = <<EOF
-{
-  "rules": [
-    {
-      "rulePriority": 1,
-      "description": "Expire images older than 14 days",
-      "selection": {
-        "tagStatus": "untagged",
-        "countType": "sinceImagePushed",
-        "countUnit": "days",
-        "countNumber": 14
-      },
-      "action": {
-        "type": "expire"
-      }
-    }
-  ]
-}
-EOF
-}

@@ -25,12 +25,15 @@ resource "aws_key_pair" "master_public_key" {
 }
 
 
+data "aws_ssm_parameter" "amazon_linux_2023" {
+  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+}
 
 
 # Creates the EC2 
 resource "aws_instance" "jenkins_server" {
 
-  ami           = "ami-0fef201115eefe936"
+  ami           = data.aws_ssm_parameter.amazon_linux_2023.value
   instance_type = "t3.small"
 
   vpc_security_group_ids = [
@@ -39,15 +42,23 @@ resource "aws_instance" "jenkins_server" {
 
   subnet_id = aws_subnet.public_subnet_1.id
 
+  iam_instance_profile = aws_iam_instance_profile.jenkins_instance_profile.name
+
 
 
   key_name = aws_key_pair.master_public_key.key_name
 
   associate_public_ip_address = true
 
-  # Attaches the IAM Instance Profile to the EC2 instance
+  root_block_device {
+    volume_size           = 30
+    volume_type           = "gp3"
+    encrypted             = true
+    delete_on_termination = true
+  }
+
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project = "Tech-Challenge-2"
   }
 }

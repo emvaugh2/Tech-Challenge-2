@@ -1,10 +1,12 @@
 
 # Creates the overall VPC
 resource "aws_vpc" "supernet" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project = "Tech-Challenge-2"
   }
 }
 
@@ -16,7 +18,10 @@ resource "aws_subnet" "public_subnet_1" {
   availability_zone       = "us-east-1a"
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project                                 = "Tech-Challenge-2"
+    Name                                    = "tc2-public-subnet-1"
+    "kubernetes.io/role/elb"                = "1"
+    "kubernetes.io/cluster/tc2-eks-cluster" = "shared"
   }
 
 }
@@ -29,7 +34,10 @@ resource "aws_subnet" "public_subnet_2" {
   availability_zone       = "us-east-1b"
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project                                 = "Tech-Challenge-2"
+    Name                                    = "tc2-public-subnet-2"
+    "kubernetes.io/role/elb"                = "1"
+    "kubernetes.io/cluster/tc2-eks-cluster" = "shared"
   }
 }
 
@@ -41,7 +49,10 @@ resource "aws_subnet" "private_subnet_1" {
   availability_zone       = "us-east-1a"
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project                                 = "Tech-Challenge-2"
+    Name                                    = "tc2-private-subnet-1"
+    "kubernetes.io/role/internal-elb"       = "1"
+    "kubernetes.io/cluster/tc2-eks-cluster" = "shared"
   }
 }
 
@@ -53,7 +64,10 @@ resource "aws_subnet" "private_subnet_2" {
   availability_zone       = "us-east-1b"
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project                                 = "Tech-Challenge-2"
+    Name                                    = "tc2-private-subnet-2"
+    "kubernetes.io/role/internal-elb"       = "1"
+    "kubernetes.io/cluster/tc2-eks-cluster" = "shared"
   }
 }
 
@@ -62,7 +76,7 @@ resource "aws_eip" "nat_eip" {
   domain = "vpc"
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project = "Tech-Challenge-2"
   }
 }
 
@@ -71,7 +85,7 @@ resource "aws_internet_gateway" "public_igw" {
   vpc_id = aws_vpc.supernet.id
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project = "Tech-Challenge-2"
   }
 }
 
@@ -83,7 +97,7 @@ resource "aws_nat_gateway" "nat_gateway" {
   depends_on = [aws_internet_gateway.public_igw]
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project = "Tech-Challenge-2"
   }
 }
 
@@ -93,7 +107,7 @@ resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.supernet.id
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project = "Tech-Challenge-2"
   }
 }
 
@@ -127,7 +141,7 @@ resource "aws_route_table" "private_rt" {
   vpc_id = aws_vpc.supernet.id
 
   tags = {
-    Project = "Tech-Challenge-1"
+    Project = "Tech-Challenge-2"
   }
 }
 

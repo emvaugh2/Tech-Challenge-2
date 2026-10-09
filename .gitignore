@@ -6,7 +6,25 @@ venv/
 .env
 .git/
 
-.terrafor/
+.terraform/
 *.tfstate
 *.tfstate.*
 *.pem
+**/.terraform/*
+*/.terraform/*
+**/.terraform/**
+
+crash.og
+crash.*.log
+
+*.tfplan
+tfplan
+plan.txt
+
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+!*.tfvars.example
