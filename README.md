@@ -11,7 +11,10 @@ Phase 4: Manual Flask Deployment with Helm
 
 Okay lets get this started! We'll clone my GitHub repo so I can access my Hello Cruel World app. Then, build the image. Verify that it's there. Then, we need to authenticate Docker to ECR using the commands listed in the notes. Now we need to tag our image and push it to the ECR. I was running into an issue with the docker push command. It wasn't finishing the push to the ECR. I was missing the `sudo` on the docker login command so I had to change that. Silly mistakes!
 
-Lets create our custom namespace for this challenge. We'll name it `tc2`. Then, we'll create out helm chart. This will generate all the sub-directories we need for our Helm deployment. We'll need to alter some of these files. 
+Lets create our custom namespace for this challenge. We'll name it `tc2`. Then, we'll create out helm chart. This will generate all the sub-directories we need for our Helm deployment. We'll need to alter some of these files. We'll be altering our Charts.yaml and values.yaml files. We'll remove our tests directory and our httproute.yaml file. I ran into an error message with the values.yaml file. There were a few parts where I left the {} brackets where I added values. I had to remove the brackets since I believe that denotes an empty space. 
+
+Then I ran into an issue with the Charts.yaml file. Apparently Helm didn't like that we still had the NOTES.txt file. I removed it. There was so much troubleshooting after this. I don't even remember each part. We'll just have to go back over this section but we finally got it to work. 
+
 
 
 Phase 3: EKS cluster setup and add-ons

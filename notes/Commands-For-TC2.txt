@@ -239,3 +239,26 @@ kubectl create namespace tc2
 
 # mkdir -p helm (do this in your Tech-Challenge-2 directory if you don't already have this folder)
 helm create helm/hello-cruel-world
+
+rm -rf test 
+rm NOTES.txt 
+rm httproute.yaml
+
+helm lint helm/hello-cruel-world/
+
+helm template hello-cruel-world \
+helm/hello-cruel-world \
+--namespace tc2 \
+--set image.repository="$ECR_REPOSITORY" \
+--set image.tag=latest
+
+
+helm upgrade --install hello-cruel-world \
+helm/hello-cruel-world \
+--namespace tc2 \
+--set image.repository="$ECR_REPOSITORY" \
+--set image.tag=latest
+
+# Use this command in the Tech-Challenge-2 directory after you update the image: with your ECR repo link
+# in the values.yaml file. 
+helm upgrade hello-cruel-world helm/hello-cruel-world --namespace tc2
