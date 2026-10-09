@@ -1,0 +1,24 @@
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DOCKER_GID: ${DOCKER_GID:?DOCKER_GID must be set}
+    image: tc2-jenkins:lts
+    container_name: tc2-jenkins
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      AWS_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
+      EKS_CLUSTER_NAME: tc2-eks-cluster
+      ECR_REPOSITORY_NAME: hello-cruel-world-repo
+      KUBERNETES_NAMESPACE: tc2
+      HELM_RELEASE_NAME: hello-cruel-world
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+volumes:
+  jenkins_home:
+    name: tc2_jenkins_home

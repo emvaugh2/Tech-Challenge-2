@@ -1,0 +1,10 @@
+workflow-aggregator
+git
+github
+github-branch-source
+credentials-binding
+pipeline-stage-view
+ws-cleanup
+timestamper
+ansicolor
+docker-workflow
