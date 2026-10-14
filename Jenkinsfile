@@ -48,7 +48,11 @@ pipeline {
                                 --output text)
                             printf '%s' "${ECR_REPOSITORY%/*}"
                         ''',
+<<<<<<< HEAD
                        returnStdout: true
+=======
+*                       returnStdout: true
+>>>>>>> de48ec9 (Manual testing of Argo CD to pick up on replicaCount change.)
                     ).trim()
                     env.FULL_IMAGE = "${env.ECR_REPOSITORY}:${env.IMAGE_TAG}"
                     env.KUBECONFIG = "${env.WORKSPACE}/.kube/config"
@@ -196,7 +200,11 @@ pipeline {
                     done
                     echo "Application response: $RESPONSE"
                     echo "$RESPONSE" |
+<<<<<<< HEAD
                         grep -F "Hello (cruel), World!"
+=======
+                        grep -F "Hello, (Cruel) World!"
+>>>>>>> de48ec9 (Manual testing of Argo CD to pick up on replicaCount change.)
                 '''
             }
         }
@@ -232,4 +240,7 @@ pipeline {
         }
     }
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> de48ec9 (Manual testing of Argo CD to pick up on replicaCount change.)

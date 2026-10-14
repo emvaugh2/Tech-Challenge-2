@@ -1,0 +1,231 @@
+# Jenkins-Pipeline-Verification-Checks-TC2
+
+pipeline {
+    agent any
+    stages {
+        stage('Verify Docker') {
+            steps {
+                sh '''
+                    set -eux
+                    whoami
+                    id
+                    docker --version
+                    docker ps
+                '''
+            }
+        }
+    }
+}
+
+pipeline {
+    agent any
+    environment {
+        AWS_REGION = 'us-east-1'
+        AWS_DEFAULT_REGION = 'us-east-1'
+    }
+    stages {
+        stage('Verify AWS Identity') {
+            steps {
+                sh '''
+                    set -eux
+                    aws --version
+                    aws sts get-caller-identity
+                '''
+            }
+        }
+    }
+}
+
+pipeline {
+    agent any
+    stages {
+        stage('Verify GitHub Access') {
+            steps {
+                sh '''
+                    set -eux
+                    git --version
+                    git ls-remote https://github.com/emvaugh2/Tech-Challenge-2.git HEAD
+                '''
+            }
+        }
+    }
+}
+
+pipeline {
+    agent any
+    environment {
+        AWS_REGION = 'us-east-1'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        ECR_REPOSITORY_NAME = 'hello-cruel-world-repo'
+    }
+    stages {
+        stage('Verify ECR Access') {
+            steps {
+                sh '''
+                    set -eux
+                    aws ecr describe-repositories \
+                        --repository-names "$ECR_REPOSITORY_NAME" \
+                        --region "$AWS_REGION"
+                    ECR_REPOSITORY=$(aws ecr describe-repositories \
+                        --repository-names "$ECR_REPOSITORY_NAME" \
+                        --region "$AWS_REGION" \
+                        --query 'repositories[0].repositoryUri' \
+                        --output text)
+                    ECR_REGISTRY="${ECR_REPOSITORY%/*}"
+                    echo "Repository: $ECR_REPOSITORY"
+                    echo "Registry: $ECR_REGISTRY"
+                    aws ecr get-login-password \
+                        --region "$AWS_REGION" |
+                    docker login \
+                        --username AWS \
+                        --password-stdin "$ECR_REGISTRY"
+                '''
+            }
+        }
+    }
+    post {
+        always {
+            sh '''
+                ECR_REPOSITORY=$(aws ecr describe-repositories \
+                    --repository-names "$ECR_REPOSITORY_NAME" \
+                    --region "$AWS_REGION" \
+                    --query 'repositories[0].repositoryUri' \
+                    --output text 2>/dev/null || true)
+                if [ -n "$ECR_REPOSITORY" ] && [ "$ECR_REPOSITORY" != "None" ]; then
+                    docker logout "${ECR_REPOSITORY%/*}" || true
+                fi
+            '''
+        }
+    }
+}
+
+pipeline {
+    agent any
+    environment {
+        AWS_REGION = 'us-east-1'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        EKS_CLUSTER_NAME = 'tc2-eks-cluster'
+    }
+    stages {
+        stage('Generate EKS Kubeconfig') {
+            steps {
+                sh '''
+                    set -eux
+                    mkdir -p "$WORKSPACE/.kube"
+                    aws eks update-kubeconfig \
+                        --region "$AWS_REGION" \
+                        --name "$EKS_CLUSTER_NAME" \
+                        --kubeconfig "$WORKSPACE/.kube/config"
+                    test -f "$WORKSPACE/.kube/config"
+                    KUBECONFIG="$WORKSPACE/.kube/config" \
+                        kubectl config current-context
+                '''
+            }
+        }
+    }
+}
+
+pipeline {
+    agent any
+    environment {
+        AWS_REGION = 'us-east-1'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        EKS_CLUSTER_NAME = 'tc2-eks-cluster'
+        KUBERNETES_NAMESPACE = 'tc2'
+    }
+    stages {
+        stage('Configure EKS') {
+            steps {
+                sh '''
+                    set -eux
+                    mkdir -p "$WORKSPACE/.kube"
+                    aws eks update-kubeconfig \
+                        --region "$AWS_REGION" \
+                        --name "$EKS_CLUSTER_NAME" \
+                        --kubeconfig "$WORKSPACE/.kube/config"
+                '''
+            }
+        }
+        stage('Verify Kubernetes') {
+            steps {
+                withEnv(["KUBECONFIG=${WORKSPACE}/.kube/config"]) {
+                    sh '''
+                        set -eux
+                        kubectl version --client
+                        kubectl get nodes -o wide
+                        kubectl get deployment,pods,service,ingress,hpa \
+                            --namespace "$KUBERNETES_NAMESPACE"
+                    '''
+                }
+            }
+        }
+    }
+}
+
+pipeline {
+    agent any
+    environment {
+        AWS_REGION = 'us-east-1'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        EKS_CLUSTER_NAME = 'tc2-eks-cluster'
+        KUBERNETES_NAMESPACE = 'tc2'
+    }
+    stages {
+        stage('Configure EKS') {
+            steps {
+                sh '''
+                    set -eux
+                    mkdir -p "$WORKSPACE/.kube"
+                    aws eks update-kubeconfig \
+                        --region "$AWS_REGION" \
+                        --name "$EKS_CLUSTER_NAME" \
+                        --kubeconfig "$WORKSPACE/.kube/config"
+                '''
+            }
+        }
+        stage('Verify Helm') {
+            steps {
+                withEnv(["KUBECONFIG=${WORKSPACE}/.kube/config"]) {
+                    sh '''
+                        set -eux
+                        helm version
+                        helm list --namespace "$KUBERNETES_NAMESPACE"
+                        helm status hello-cruel-world \
+                            --namespace "$KUBERNETES_NAMESPACE"
+                    '''
+                }
+            }
+        }
+    }
+}
+
+pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/emvaugh2/Tech-Challenge-2.git'
+            }
+        }
+        stage('Validate Helm Chart') {
+            steps {
+                sh '''
+                    set -eux
+                    helm lint ./helm/hello-cruel-world
+                    helm template hello-cruel-world \
+                        ./helm/hello-cruel-world \
+                        --namespace tc2 \
+                        > /tmp/hello-cruel-world-rendered.yaml
+                    grep -n "kind:" /tmp/hello-cruel-world-rendered.yaml
+                    grep -n "containerPort: 5000" /tmp/hello-cruel-world-rendered.yaml
+                '''
+            }
+        }
+    }
+    post {
+        always {
+            sh 'rm -f /tmp/hello-cruel-world-rendered.yaml'
+        }
+    }
+}

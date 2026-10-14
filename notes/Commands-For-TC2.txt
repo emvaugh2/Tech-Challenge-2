@@ -262,3 +262,194 @@ helm/hello-cruel-world \
 # Use this command in the Tech-Challenge-2 directory after you update the image: with your ECR repo link
 # in the values.yaml file. 
 helm upgrade hello-cruel-world helm/hello-cruel-world --namespace tc2
+
+
+
+
+################################### Phase 5 ############################################
+
+# Installs Docker Compose
+sudo mkdir -p /usr/libexec/docker/cli-plugins/
+sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+docker compose version
+
+# Updates Docker Buildx for Docker Compose
+sudo rm -f /usr/libexec/docker/cli-plugins/docker-buildx
+HOST="https://github.com"
+PATH_URI="/docker/buildx/releases/download/v0.17.0/buildx-v0.17.0.linux-amd64"
+sudo curl -SL "${HOST}${PATH_URI}" -o /usr/libexec/docker/cli-plugins/docker-buildx
+sudo chmod +x /usr/libexec/docker/cli-plugins/docker-buildx
+docker buildx version
+
+printf 'DOCKER_GID=%s\n' "$(stat -c '%g' /var/run/docker.sock)" > .env
+
+
+sudo docker compose \
+  --env-file .env \
+  -f custom-jenkins-compose.yml \
+  config --environment
+
+sudo docker compose \
+  --env-file .env \
+  -f custom-jenkins-compose.yml \
+  config
+
+docker compose -f custom-jenkins-compose.yml config 
+docker compose -f custom-jenkins-compose.yml build
+docker compose -f custom-jenkins-compose.yml up -d
+
+# Custom Jenkins container verification checks for Installs
+
+
+Edward V <edwardvaughnv@gmail.com>
+12:20 PM (0 minutes ago)
+to me
+
+cd ~/Tech-Challenge-2/jenkins
+echo "===== COMPOSE STATUS ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  ps
+echo
+echo "===== JENKINS CONTAINER ====="
+sudo docker ps \
+  --filter name=tc2-jenkins
+echo
+echo "===== GIT ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  git --version
+echo
+echo "===== DOCKER CLI ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  docker --version
+echo
+echo "===== DOCKER SOCKET ACCESS ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  docker ps
+echo
+echo "===== AWS CLI ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  aws --version
+echo
+echo "===== AWS IDENTITY ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  aws sts get-caller-identity
+echo
+echo "===== KUBECTL ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  kubectl version --client
+echo
+echo "===== HELM ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  helm version
+echo
+echo "===== GENERATE EKS KUBECONFIG ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  aws eks update-kubeconfig \
+  --region us-east-1 \
+  --name tc2-eks-cluster
+echo
+echo "===== EKS NODES ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  kubectl get nodes -o wide
+echo
+echo "===== TC2 PODS ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  kubectl get pods \
+  --namespace tc2 \
+  -o wide
+echo
+echo "===== TC2 HELM RELEASES ====="
+sudo docker compose \
+  -f custom-jenkins-compose.yml \
+  exec jenkins \
+  helm list \
+  --namespace tc2
+echo
+echo "===== VERIFICATION COMPLETE ====="
+
+
+
+########################### Phase 6 #############################
+# 1. Confirm the current number of nodes
+kubectl get nodes
+# 2. Create a temporary Deployment
+kubectl create deployment capacity-test \
+  --image=nginx:1.27 \
+  --namespace tc2
+# 3. Give each Pod a large CPU and memory request
+kubectl set resources deployment capacity-test \
+  --namespace tc2 \
+  --requests=cpu=900m,memory=512Mi \
+  --limits=cpu=900m,memory=512Mi
+# 4. Scale the temporary Deployment to three Pods
+kubectl scale deployment capacity-test \
+  --namespace tc2 \
+  --replicas=3
+# 5. Check the Pods
+kubectl get pods \
+  --namespace tc2
+# 6. Check for a second worker node periodically
+kubectl get nodes
+# 7. Recheck the Pods periodically
+kubectl get pods \
+  --namespace tc2
+# 8. After the second node appears and all capacity-test Pods are Running,
+# delete the temporary Deployment
+kubectl delete deployment capacity-test \
+  --namespace tc2
+# 9. Confirm the temporary Pods were removed
+kubectl get pods \
+  --namespace tc2
+# 10. Periodically check whether the extra node scales back down
+kubectl get nodes
+
+
+################################### Phase 7 #####################################
+
+# Install Argo CD 
+kubectl create namespace argocd
+
+kubectl apply \
+--namespace argocd \
+--server-side \
+--force-conflicts \
+-f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+
+# Gets Argo CD password. Username is admin.
+kubectl get secret argocd-initial-admin-secret \
+--namespace argocd \
+-o jsonpath='{.data.password}' | 
+base64 --decode
+
+echo
+
+
+
+# Acceses Argo CD UI 
+kubectl port-forward \
+service/argocd-server \
+--namespace argocd \
+8082:443
