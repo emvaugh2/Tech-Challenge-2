@@ -1,6 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    gitops-test: "1"
   name: {{ include "hello-cruel-world.fullname" . }}
   labels:
     {{- include "hello-cruel-world.labels" . | nindent 4 }}
