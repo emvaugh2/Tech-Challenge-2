@@ -453,3 +453,7 @@ kubectl port-forward \
 service/argocd-server \
 --namespace argocd \
 8082:443
+
+
+kubectl get deployment hello-cruel-world -n tc2 -o yaml | grep -A3 annotations
+

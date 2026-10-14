@@ -9,7 +9,9 @@ Phase 7: GitOps with GitHub Actions and ArgoCD.
 
 10/14
 
-I had to add port 8082 to the Jenkins SG to allow connection to the Argo CD dashboard. Okay, we're going to manually test the Argo CD to make sure we see that it's out of sync and corrects the deployment. After that, we'll automate a change to GitHub and see if Argo CD picks up on the change and corrects it. 
+I had to add port 8082 to the Jenkins SG to allow connection to the Argo CD dashboard. Okay, we're going to manually test the Argo CD to make sure we see that it's out of sync and corrects the deployment. After that, we'll automate a change to GitHub and see if Argo CD picks up on the change and corrects it. We initially went with a replicaCount update from 1 to 2 but we think maybe the HPA service was messing up this test. We saw the update in Argo CD but our actual deployment never went to 2 replicas. We decided to just make a harmless annotation update in our templates/deployment.yaml file and see if it makes Argo CD go out of sync. Argo CD was out of sync We're going to resync it now. 
+
+The last part of the phase is to automate this entire procecss. We're going to turn the auto-sync function on in Argo CD. I believe we'll create some type of webhook for GitHub as well. I created the workflows directory under the .github directory on our local device. I also created the `gitops.yaml` file where we'll put our automation code. We need to create some secrets for GitHub Actions to allow this workflow. 
 
 10/14
 
