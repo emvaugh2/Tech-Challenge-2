@@ -1,3 +1,162 @@
+## AWS Cloud Engineer
+
+**Greetings! We'll be going over the tasks for Tech Challenge 2 of the Cloud Engineering program. Lets get started!**
+
+## Tech Challenge 2 - Action Steps
+
+* Phase 1: Run the app locally in a container
+* Phase 2: Terraform the AWS environment
+* Phase 3: EKS cluster setup and add-ons
+* Phase 4: Manual Flask Deployment with Helm
+* Phase 5: Jenkins CI/CD Automation
+* Phase 6: HPA and Node Autoscaler Load Tests
+* Phase 7: GitOps with GitHub Actions and ArgoCD
+
+
+________________________
+
+
+## Tech Challenge Overview
+
+Welcome to Tech Challenge 2! The overall goal for this challenge is to deploy a Python Flask application automatically using a CI/CD pipeline. The initial pipeline will use a Jenkins server to deploy a custom Python image built by Kubernetes (K8s) from a Helm chart. Since we'll be implementing a metrics server and an AWS Load Balancer Controller, we'll conduct a load test as well on the application to demonstrate automatic scaling in K8s. Lastly, we'll remove the Jenkins server and run the same pipeline utilizing webhooks via GitHub Actions and use Argo CD to make sure our K8s application deployment always matches the desired state defined in our GitHub repo. 
+
+Lets do this!
+
+## Phase 1: Run the app locally in a container
+
+We'll start Tech Challenge 2 (TC2) the same way as we started Tech Challenge 1 (TC1) by locally testing our application to verify it functions appropriately. TC2 asks for a simple "Hello, World!" Python Flask app so I went online and grabbed some code from medium.com article. We modified the code so it will utilize a web browser on port 5000 to showcase the message. I decided to later change the message to "Hello (cruel), World!" just for fun. 
+
+ ![Python Flask app modified for TC2](pictures/Phase1/tc2phase1pic1.png)
+
+
+Lets make sure the Python script works. I logged into my EC2 instance and created a Python virtual environment in order to run my script. Use the command `python3 <script_name>` in order to run your script. In this first terminal, you'll see the script begin and show that's it's listening on the specified port. You can also use `ss -tunlpe` to make sure the app is running on the proper port.  
+
+![Shows Python script startup and virtual environment](pictures/Phase1/tc2phase1pic3.png)
+
+In a second terminal onthe EC2 instance, perform a curl test on the local machine using `curl -i http://localhost:5000` to received the success message.
+
+![Displays success message in sepearate terminal](pictures/Phase1/tc2phase1pic4.png)
+
+
+If you go back to the first termainl, you'll also see the GET request posted to your script. That verifies that the script is functioning as intended!
+
+![Verifies GET request in first terminal](pictures/Phase1/tc2phase1pic5.png)
+
+
+Now, lets containerize our application using Docker. Install Docker and make sure the service has started. 
+
+
+![Install, start and enable Docker](pictures/Phase1/tc2phase1pic2.png)
+
+
+Now, we need to package our Python script and the required packages all in one Dockerfile so we can create an image and run a container from this image. In a previous Python lab, I ran a similar script and created the requirements.txt file so I'll be reusing those with the Dockerfile. You can use my Dockerfile in my repo. Once you run the `docker build` command, your image will be built. Start your container using the `docker run` command and check to see if the container is running by using the `docker ps` command. We can use `docker log tc2-hello-world` to verify the container is listening on the right port.
+
+
+![Shows image creation and container running](pictures/Phase1/tc2phase1pic6.png)
+
+Now, our final test for Phase 1 will be making sure the container displays the success message as well. Use the same curl test to make sure we receive the proper output. This time, we don't need to open a second window since the script is being ran inside the container. You should receive "Hello (cruel), World!" in your terminal output!
+
+![Container success message verification](pictures/Phase1/tc2phase1pic7.png)
+
+Lets push our Dockerfile and required script files to our GitHub repository (repo) so we can use them later on for our pipelines. You can use the sequence of `git add .`, `git commit -m "<insert_message>"`, and `git push origin main` to accomplish this. 
+
+Now, lets terraform our infrastructure so that we can run all of this in the cloud. 
+
+
+## Phase 2: Terraform the AWS environment
+
+We need to make sure our entire AWS environment can automatically be deployed to support our application. We'll use Infrastructure as Code (IaC) via Terraform (TF) to deploy our environment. Now, in Project 2, we already created an Elastic Kubernetes Service (EKS) resource that included a cluster and worker node group so I'm overall familiar with this TF block. The difference this time was we would later create the AWS Load Balancer Controller within EKS so this is not a resource block that needed to be added. 
+
+In TC1, we also created two different Elastic Container Registry repos so I borrowed from that code to create our one and only `hello-cruel-world-repo` repo. The networking.tf and jenkins.tf files pretty much stayed the same from the previous challenge. Just a reminder, the Jenkins server, NAT Gateway, and ALB will go in the public subnets. The EKS worker nodes and application pods will go in the private subnets. We added AWS DNS support in our VPC block. We did, however, update the providers.tf file to include [I honestly forget]. 
+
+Another weird piece was allowing the AWS Load Balancer Controller to figure out which subnets it could use. We placed this information in the tag section of the subnets. I've never seen that before. Apparently the Kubernetes tag tells the controller that you can use this for the AWS load balancer.
+
+Now, I straight up asked AI to create the iam.tf file because I simply don't want to deal with AWS IAM. Once again, I have an Azure background and I'm not used to handling this. I'll focus on it at a later time.
+
+![Terraform file structure](pictures/Phase2/tc2phase2pic1.png)
+
+I actually deployed the resources file by file until I had everything working properly. I used this approach because I didn't want to create 8 TF files and have to troubleshoot which ones didn't work because some of these resources depend on other resources. So I asked AI to categorize the TF files based on which ones I should design first. There was a lot of terraform apply and destroy until we arrived to the very end. 
+
+![Initializing Terraform and validating the deployment](pictures/Phase2/tc2phase2pic2.png)
+
+
+The final deployment created 44 resources for us. Now our AWS environment is ready to be used to deploy our application. 
+
+![Terraform apply successfully deployed](pictures/Phase2/tc2phase2pic3.png)
+
+
+There were a few modifications post-apply that were added but they should be included in the final TF code inside the repo. Lets move to Phase 3. 
+
+
+
+## Phase 3: EKS cluster setup and add-ons
+
+
+![Terraform file structure](pictures/Phase3/tc2phase3pic1.png)
+
+
+![Terraform file structure](pictures/Phase3/tc2phase3pic2.png)
+
+
+![Terraform file structure](pictures/Phase3/tc2phase3pic3.png)
+
+
+![Terraform file structure](pictures/Phase3/tc2phase3pic4.png)
+
+
+![Terraform file structure](pictures/Phase3/tc2phase3pic5.png)
+
+
+![Terraform file structure](pictures/Phase3/tc2phase3pic6.png)
+
+
+
+## Phase 4: Manual Flask Deployment with Helm
+
+![Terraform file structure](pictures/Phase4/tc2phase4pic1.png)
+
+## Phase 5: Jenkins CI/CD Automation
+
+![Terraform file structure](pictures/Phase5/tc2phase5pic1.png)
+
+## Phase 6: HPA and Node Autoscaler Load Tests
+
+![Terraform file structure](pictures/Phase6/tc2phase6pic1.png)
+
+## Phase 7: GitOps with GitHub Actions and ArgoCD
+
+![Terraform file structure](pictures/Phase7/tc2phase7pic1.png)
+
+
+Clarification notes:
+
+A service account gives a workload running inside Kubernetes an identity. Think of it like a non-human admin. It's assuming an IAM role. The annotate command added metadata to the service account. It tells EKS that the pods using this service account should be allowed to assume this AWS IAM role. This allows EKS to inject AWS role (and token information) into the Pod.
+
+The rollout command waits for the deployment to finish. I guess it's kind of like a status loading bar. It actively waits until it's done rolling out. 
+
+A helm repo contains specific Helm charts and an index (manual) describing the available charts and versions. We needed this for the AWS EKS repo for the AWS load balancer controller. The charts are templates that create these types of services so that's why we have to install these repos. You don't want to create these deployment.yaml files from scratch, right? Then use the repo and the charts. 
+
+`kube-system` is a namespace. It's reservered for cluster-level system components created by K8s or installed to operate the cluster. So the big ones like Cluster DNS, metrics, load balancer automation, node autoscaling, etc support the entire system. Your hello cruel world application is just one part of the system so it should be in another namespace. 
+
+
+10/8/2026
+
+So, we'll start by deploying our Terraform infrastructure again. We'll validate that both the cluster and worker nodes have been created. I'll include the `aws eks` commands in the notes. We're going to use the Jenkins server as the mgmt jumpbox as well to run all of our commands. When you log into your Jenkins server, run `aws sts get-caller-identity` to make sure you have the proper privileges. You can install all the CLIs afterwards. I ran the `describe-nodegroup` command and received an unauthorized error message. We needed to update the permissions on our Jenkins server IAM role. I saved those changes. When then ran into a time-out issue when retrieving the pods and nodes. The traffic from the Jenkins server to the EKS API was being blocked. We needed to create an ingress rule on port 443 from the Jenkins server to the EKS automatically created SG. I added this block to the security.tf file in Terraform. Once I deployed, we were able to confirm the proper pods (aws-node-lb, two coredns pods, and kube-proxy). Now we're cooking
+
+Lets create the Metrics Server. I put all the commands in the notes. You should be able to see the metrics of the pods and nodes if you use the `kubectl top` command. The rollout command ********************** . Now, lets create the AWS Load Balancer. We need to install it and then verify it. It will watch the K9s Ingress and then provision an AWS Application Load Balancer. I put all the commands in the notes as well as there are a lot of them. Once you verify with the get deployment and get pods commands, we can move onto the Autoscaler. We did run into a few IAM issues when it came to retrieving basic AWS information so I also updated the iam.tf file for TF. 
+
+Lets do the Autoscaler. I have all the commands listed in the notes as well since there are A LOT. After everything was said and done, we ran into two failures regarding the Autoscaler missing the AWS region. We're going to fix that. We need to redeploy our `helm (upgrade) cluster-autoscaler` command and hardcode our region and cloud provider for some reason. Once we did that, our error messages cleared. We ran our last checks with out get commands and verified everything is up and running! That completes this phase. 
+
+10/07/2026
+
+- Install Metrics Server
+- AWS Load Balancer Controller
+- Cluster Autoscaler
+
+
+
+
+
 
 
 
@@ -11,7 +170,9 @@ Phase 7: GitOps with GitHub Actions and ArgoCD.
 
 I had to add port 8082 to the Jenkins SG to allow connection to the Argo CD dashboard. Okay, we're going to manually test the Argo CD to make sure we see that it's out of sync and corrects the deployment. After that, we'll automate a change to GitHub and see if Argo CD picks up on the change and corrects it. We initially went with a replicaCount update from 1 to 2 but we think maybe the HPA service was messing up this test. We saw the update in Argo CD but our actual deployment never went to 2 replicas. We decided to just make a harmless annotation update in our templates/deployment.yaml file and see if it makes Argo CD go out of sync. Argo CD was out of sync We're going to resync it now. 
 
-The last part of the phase is to automate this entire procecss. We're going to turn the auto-sync function on in Argo CD. I believe we'll create some type of webhook for GitHub as well. I created the workflows directory under the .github directory on our local device. I also created the `gitops.yaml` file where we'll put our automation code. We need to create some secrets for GitHub Actions to allow this workflow. 
+The last part of the phase is to automate this entire procecss. We're going to turn the auto-sync function on in Argo CD. I believe we'll create some type of webhook for GitHub as well. I created the workflows directory under the .github directory on our local device. I also created the `gitops.yaml` file where we'll put our automation code. We need to create some secrets for GitHub Actions to allow this workflow. My ECR repo was wrong so I had to update that. Once I did that, I ran into another issue with git push but we redefined our gitops.yaml file to bypass this. The final deployment worked and we verified by making sure the new image tag was updated with whatever the Git SHA was. Then lastly, we deployed the URL to make sure it showed our Python app. 
+
+That concludes the project!
 
 10/14
 
@@ -82,69 +243,3 @@ UPDATE: Okay the issue with the port was that my app was listening on port 5000 
 
 In order to push to my GitHub repo from my EC2 instance, I had to generate a fine-used token with the permissions of Content for Read & Write. That was also a quick headache. Had to side-step that. 
 
-Phase 3: EKS cluster setup and add-ons
-
-
-Clarification notes:
-
-A service account gives a workload running inside Kubernetes an identity. Think of it like a non-human admin. It's assuming an IAM role. The annotate command added metadata to the service account. It tells EKS that the pods using this service account should be allowed to assume this AWS IAM role. This allows EKS to inject AWS role (and token information) into the Pod.
-
-The rollout command waits for the deployment to finish. I guess it's kind of like a status loading bar. It actively waits until it's done rolling out. 
-
-A helm repo contains specific Helm charts and an index (manual) describing the available charts and versions. We needed this for the AWS EKS repo for the AWS load balancer controller. The charts are templates that create these types of services so that's why we have to install these repos. You don't want to create these deployment.yaml files from scratch, right? Then use the repo and the charts. 
-
-`kube-system` is a namespace. It's reservered for cluster-level system components created by K8s or installed to operate the cluster. So the big ones like Cluster DNS, metrics, load balancer automation, node autoscaling, etc support the entire system. Your hello cruel world application is just one part of the system so it should be in another namespace. 
-
-
-10/8/2026
-
-So, we'll start by deploying our Terraform infrastructure again. We'll validate that both the cluster and worker nodes have been created. I'll include the `aws eks` commands in the notes. We're going to use the Jenkins server as the mgmt jumpbox as well to run all of our commands. When you log into your Jenkins server, run `aws sts get-caller-identity` to make sure you have the proper privileges. You can install all the CLIs afterwards. I ran the `describe-nodegroup` command and received an unauthorized error message. We needed to update the permissions on our Jenkins server IAM role. I saved those changes. When then ran into a time-out issue when retrieving the pods and nodes. The traffic from the Jenkins server to the EKS API was being blocked. We needed to create an ingress rule on port 443 from the Jenkins server to the EKS automatically created SG. I added this block to the security.tf file in Terraform. Once I deployed, we were able to confirm the proper pods (aws-node-lb, two coredns pods, and kube-proxy). Now we're cooking
-
-Lets create the Metrics Server. I put all the commands in the notes. You should be able to see the metrics of the pods and nodes if you use the `kubectl top` command. The rollout command ********************** . Now, lets create the AWS Load Balancer. We need to install it and then verify it. It will watch the K9s Ingress and then provision an AWS Application Load Balancer. I put all the commands in the notes as well as there are a lot of them. Once you verify with the get deployment and get pods commands, we can move onto the Autoscaler. We did run into a few IAM issues when it came to retrieving basic AWS information so I also updated the iam.tf file for TF. 
-
-Lets do the Autoscaler. I have all the commands listed in the notes as well since there are A LOT. After everything was said and done, we ran into two failures regarding the Autoscaler missing the AWS region. We're going to fix that. We need to redeploy our `helm (upgrade) cluster-autoscaler` command and hardcode our region and cloud provider for some reason. Once we did that, our error messages cleared. We ran our last checks with out get commands and verified everything is up and running! That completes this phase. 
-
-10/07/2026
-
-- Install Metrics Server
-- AWS Load Balancer Controller
-- Cluster Autoscaler
-
-
-Phase 2: Terraform the AWS environment. 
-
-
-10/07/2026
-
-We're going through each file and verifying that it's correct. The providers.tf file is good. We're adding a few things to the networking.tf file. Just a reminder, the Jenkins server, NAT Gateway, and ALB will go in the public subnets. The EKS worker nodes and application pods will go in the private subnets. We added AWS DNS support in our VPC block. I'll have to figure out why this is important exactly. The answer was pretty vague AI gave me. 
-
-We also updated the public subnets to allow the AWS Load Balancer Controller to figure out which subnets the ALB should use. We put this in the tag section. Never once seen this before. Apparently the Kubernetes tag tells the controller that you can use this for the AWS load balancer. 
-
-For the security group (SG), we just kept the Jenkins SG. We're allowing SSH and port 8080 traffic and that's really it. The resources will handle a lot of their own networking and SG settings such as the EKS cluster and the AWS Load Balancer Controller. 
-
-The ECR was pretty straightforward. I only changed the name from my previous deployments. I also changed the lifecycle policy to only hold images for 5 days and not 14. 
-
-I confess. I had AI completely create the IAM roles outside of the Control and Worker EKS roles. I did not understand the Autoscaler, Load Balancer Controller, or Jenkins server roles. Well, I can understand the Jenkins one but the other two, I just couldn't find any resources on this and I'm tired. I'll review it later. 
-
-I ran the usual terraform fmt, validate, plan and apply. After about 15 minutes, all 44 resources deployed. How nice! Lets move on to the next phase. 
-
-10/06/2026
-
-The overall infrastructure goal is to run our container on an Elastic Kubernetes Cluster (EKS) that utilizes autoscaling and an Application Load Balancer (ALB). We need to create everything that supports this environment. We'll need a VPC with private and public subnets, route tables, internet gateway (IGW), and a NAT gateway. 
-
-Our EKS nodes will be in the private subnets. We need to also create an Elastic Container Registry (ECR) for the image. Then, we'll create our Jenkins EC2 server and our security group. 
-
-Our final phase will be handling all of AWS's IAM roles. We need a role for the EKS cluster, EKS worker group, Jenkins EC2 role, Jenkins EKS access entry, and on the newer side, roles for the AWS LB controller and cluster autoscaler. 
-
-
-Phase 1: Run the app locally in a container
-
-I found a Hello World Python Flask piece of code on Medium.com to make our app out of. We had to alter the code a little bit so that the output is reachable over a specific port. We're going to choose port 5000. When we run the script, we'll verify it works by opening a new terminal on the EC2 instance and do a test using `curl -i http://localhost:5000`. We'll use `ss -tunlpe` to make sure the app is listening on the right port. 
-
-Lets make a requirement.txt file. We'll put Flask here. After we do that, we can create our Dockerfile. Now, I already have a Dockerfile with a similar Python script in an older lab so I swapped them out. 
-
-Now, we can create the Docker image. We'll name it `tc2-hello-world:latest`. When we run the container, we'll map port 5000 on the host machine to 5000 on the container machine. We can use `docker log tc2-hello-world` to verify the container is listening on the right port. Verify in the EC2 instance that the app is working by doing another curl test after the container is running. Lastly, push all of these files to your GitHub because we'll need them later. 
-
-Don't forget to install Docker and start the service. Also, we'll create the Python virtual environment. We haven't done that in a while. I'll include the commands in a separate file. Make sure you install Python first. 
-
-Ran into a `git add .` issue. I think when I cloned my empty repo, it created another Tech-Challenge-2 folder within the original Tech-Challenge-2 folder and it had it's own .git directory. I had to delete that before I was able to add my files. 
