@@ -1,0 +1,144 @@
+## Personal Notes 
+
+Clarification notes:
+
+A service account gives a workload running inside Kubernetes an identity. Think of it like a non-human admin. It's assuming an IAM role. The annotate command added metadata to the service account. It tells EKS that the pods using this service account should be allowed to assume this AWS IAM role. This allows EKS to inject AWS role (and token information) into the Pod.
+
+The rollout command waits for the deployment to finish. I guess it's kind of like a status loading bar. It actively waits until it's done rolling out. 
+
+A helm repo contains specific Helm charts and an index (manual) describing the available charts and versions. We needed this for the AWS EKS repo for the AWS load balancer controller. The charts are templates that create these types of services so that's why we have to install these repos. You don't want to create these deployment.yaml files from scratch, right? Then use the repo and the charts. 
+
+`kube-system` is a namespace. It's reservered for cluster-level system components created by K8s or installed to operate the cluster. So the big ones like Cluster DNS, metrics, load balancer automation, node autoscaling, etc support the entire system. Your hello cruel world application is just one part of the system so it should be in another namespace. 
+
+
+10/8/2026
+
+So, we'll start by deploying our Terraform infrastructure again. We'll validate that both the cluster and worker nodes have been created. I'll include the `aws eks` commands in the notes. We're going to use the Jenkins server as the mgmt jumpbox as well to run all of our commands. When you log into your Jenkins server, run `aws sts get-caller-identity` to make sure you have the proper privileges. You can install all the CLIs afterwards. I ran the `describe-nodegroup` command and received an unauthorized error message. We needed to update the permissions on our Jenkins server IAM role. I saved those changes. When then ran into a time-out issue when retrieving the pods and nodes. The traffic from the Jenkins server to the EKS API was being blocked. We needed to create an ingress rule on port 443 from the Jenkins server to the EKS automatically created SG. I added this block to the security.tf file in Terraform. Once I deployed, we were able to confirm the proper pods (aws-node-lb, two coredns pods, and kube-proxy). Now we're cooking
+
+Lets create the Metrics Server. I put all the commands in the notes. You should be able to see the metrics of the pods and nodes if you use the `kubectl top` command. The rollout command ********************** . Now, lets create the AWS Load Balancer. We need to install it and then verify it. It will watch the K9s Ingress and then provision an AWS Application Load Balancer. I put all the commands in the notes as well as there are a lot of them. Once you verify with the get deployment and get pods commands, we can move onto the Autoscaler. We did run into a few IAM issues when it came to retrieving basic AWS information so I also updated the iam.tf file for TF. 
+
+Lets do the Autoscaler. I have all the commands listed in the notes as well since there are A LOT. After everything was said and done, we ran into two failures regarding the Autoscaler missing the AWS region. We're going to fix that. We need to redeploy our `helm (upgrade) cluster-autoscaler` command and hardcode our region and cloud provider for some reason. Once we did that, our error messages cleared. We ran our last checks with out get commands and verified everything is up and running! That completes this phase. 
+
+10/07/2026
+
+- Install Metrics Server
+- AWS Load Balancer Controller
+- Cluster Autoscaler
+
+
+
+
+
+
+
+
+
+
+
+
+Personal Notes:
+
+Phase 7: GitOps with GitHub Actions and ArgoCD. 
+
+
+10/14
+
+I had to add port 8082 to the Jenkins SG to allow connection to the Argo CD dashboard. Okay, we're going to manually test the Argo CD to make sure we see that it's out of sync and corrects the deployment. After that, we'll automate a change to GitHub and see if Argo CD picks up on the change and corrects it. We initially went with a replicaCount update from 1 to 2 but we think maybe the HPA service was messing up this test. We saw the update in Argo CD but our actual deployment never went to 2 replicas. We decided to just make a harmless annotation update in our templates/deployment.yaml file and see if it makes Argo CD go out of sync. Argo CD was out of sync We're going to resync it now. 
+
+The last part of the phase is to automate this entire procecss. We're going to turn the auto-sync function on in Argo CD. I believe we'll create some type of webhook for GitHub as well. I created the workflows directory under the .github directory on our local device. I also created the `gitops.yaml` file where we'll put our automation code. We need to create some secrets for GitHub Actions to allow this workflow. My ECR repo was wrong so I had to update that. Once I did that, I ran into another issue with git push but we redefined our gitops.yaml file to bypass this. The final deployment worked and we verified by making sure the new image tag was updated with whatever the Git SHA was. Then lastly, we deployed the URL to make sure it showed our Python app. 
+
+That concludes the project!
+
+10/14
+
+
+So, I'm still pretty new to GitOps and I've never used ArgoCD before in my life. Here's the breakdown:
+- Use GitHub Actions to build the image, push it to ECR, and update the tag in Git.
+- USe Argo CD to watch the repo, detect the new tag, and force EKS to match Git. 
+
+Argo CD is a K8s controller. It watched the live cluster and compares it to the desired state in Git. If they don't match, Argo CD fixes it. 
+
+We'll create the GitHub-to-AWS authentication using OIDC. We did this in the previous challenge so I'll alter my code to match this challenge. Then, we'll install Argo CD. THe next step is to create the Argo CD application which will identify the repo, branch, and Helm chart path. The destination will be the K8s cluster and namespace. Afterwards, we will create the GitHub ACtions workflow that will be triggered by all file changes. We'll manually test Argo CD and then do an automated synchronization test. Lastly, we'll run the entire GitOps test. 
+
+Before we get started, disable your Jenkins pipeline. We'll then get Argo CD installed and running. Lets retrieve the passcode and login as admin into the dashboard. Lets move back over to our values.yaml file on our EC2 instance and make sure the current deployment's image tag matches are values.yaml file. Once you get the tag, put the new tag in the values.yaml. Push this file to your GitHub account. 
+
+In the Argo CD dashboard, make a new app with the parameters listed in the screenshots. We ran into an out of sync issue because the Argo CD deployment was missing information in the readinessProbe and livenessProbe sections. We removed the enabled: true lines  and the Seconds lines from both our probe sections in the values.yaml file. Then we pushed the image again. 
+
+After we fixed the issues, we did a test to the application and received the proper message! So now, we will set up the GitHub Actions section. 
+
+Phase 6: HPA and Node Autoscaler Load Tests
+
+We'll conduct another load test like we did in the previous projects to test HPA and our autoscaler. Horizontal pod autoscaler (HPA) is for when the pods' resources are taxed. We can define these values in out hpa.yaml file which ultimately gets its values from the values.yml from the K8s helm manifest. We saw the pods scale up to 3 after the load test so that was really good. 
+
+The cluster autoscaler increases the number of worker nodes. This tests is a Pod needs to run but the existing node doesn't have enough requested capacity to schedule it. We needed to create an artificial deployment for this test. We made each pod have a substantial amoutn of requested capacity (whether the pod uses it or not is dependent on the load) so this would overwhelm a t3.small VM. We tried to put all 4 pods on one worker so that's why they went into pending status because the worker couldn't handle all of it. This is why EKS launched another worker node. 
+
+To artificially simulate this, we created a new deployment for our cluster with increased pod requested resources and 3 replicas. We didn't use Helm for this. We just used a normal K8s deployment. This made the pods go into Pending status until the additional worker was created. 
+
+Phase 5: Jenkins CI/CD Automation
+
+10/09/2026
+
+Okay the overall picture with this is the CI/CD pipeline will build the images using Docker, push to the ECR, then deploy to EKS using Helm and verify everything using kubectl. This isn't my first Jenkins CI/CD pipeline doing this similar task so we're going to use our custom Jenkins Dockerfile from out previous challenge. I'm going to update it to automatically install all the CLIs we need as well because currently, it just installs Docker and the AWS CLI. I want it to have Helm, Git, and kubectl as well. 
+
+Then, I'll need to construct the Jenkinsfile for the pipeline. I'll probably just use the file of the previous challenge as well and edit it. We'll figure out credentials and everything as well. Okay, I asked AI for some feedback on my updated custom Jenkins Dockerfile. Overall it was almost set but AI wanted to add a few things. It did entirely too much but that's fine. We're here now. It needed the updated version of the AWS CLI just in case we run into any issues with EKS so I'll just follow it's guidance. Please see my repo for the updated file. 
+
+AI is also suggesting I use a Docker Compose file so I don't have to manually put in all that information when doing `docker run` so I'm also going to use this as well. It'll make my life a little easier. Lastly, they suggested a plugins.txt file that Jenkins can use when I start it up. I just copied and pasted this. I don't think it's a big deal. Alright, lets get our container up and running. 
+
+That was actually a little bit of a nightmare. I had to install Docker Compose and update Docker Buildx just to use my compose.yaml file. I included all the commands in the notes. Once I did that, I did verification checks to make sure all my packages were installed on my custom container. Sometimes AI tries to be clever. We don't need to be clever here. We're going to simplify our custom Jenkins container Dockerfile to hardcode some of these things. 
+
+We got the Jenkins server up and running. I had AI create me Jenkins pipelines to verify all our credentials and operations would work smoothly. I added these verification checks in the notes as well. Lets actually come up with our acutal Jenkinsfile now. The goal is to deploy the app. So I believe we need Jenkins to pull the Dockerfile from my repo, build the image, push this to ECR, have EKS grab this from the ECR, and then use Helm to build the container with the image. I'm going to ask AI if I'm missing a step. 
+
+So my thinking was mostly correct. Helm will update the K8s deploymen to reference the new image tag. Then K8s will create a new Pod and the EKS worker node pulls the image from ECR. AI gave me 9 stages to create for this deployment with a few of the commands. I tried to write out as many stages as I could in this pipeline. I had AI just revise it. Yes, I suck at this. Haven't made that many Jenkinsfile pipelines but it's all good. 
+
+Lets go over the feedback. For Stage 1, I didn't need to clone the GitHub repo because since Jenkins is using checkout scm, it knows where to find the Jenkinsfile. Stage 2, commands were right but I used {} brackets instead of parantheses for my variables. Also, I need to create environment variables so they can persist between stages. I'll add these to the beginning of the Jenkinsfiles. 
+
+Stage 3, I believe I got this one right. I made the docker build command using the Git SHA for the tag. Stage 4, I just forgot the $ sign for my ECR_REGISTRY. Stage 5, I accidentally used the ECR registry name instead of the ECR repo name. Stage 6, I didn't state exactly where the AWS CLI should save kubeconfig. I didn't know this. 
+
+Stage 7 was terrible. I needed the release name, chart path, ECR repository override, and image tag override. All I had was the namespace. My stage 8 commands were mostly right. I had a typo in the kubectl get deployment line. Lastly, stage 9 wasn't bad but I meant to put the ALB DNS name instead of localhost although I wrote the ALB DNS variable name. I just didn't know how to call the information to the variable. 
+
+Alright I had AI correct everything. Lets run this damn thing. We ran into two syntax issues in the file. There was an uppercase C in the (Cruel) world and the placement was off "Hello, (cruel) World!" instead of "Hello (cruel), World!". So while technically we got the right outcome, the deployment failed. Once that was fixed, we had a successful deployment. 
+
+Lets create the GitHub webhook. We changed the Jenkins file to the SCM trigger and put in our repo and branch info. We then went to our repo on GitHub and made the Webhook. We had the Jenkins public IP and port. Then we left everything else blank so no password or anything. After that, we were able to push our Jenkinsfile changes to our repo and that automatically triggered the pipeline! 
+
+That wraps up Phase 5
+
+
+
+Phase 4: Manual Flask Deployment with Helm
+
+10/08/2026
+
+Okay lets get this started! We'll clone my GitHub repo so I can access my Hello Cruel World app. Then, build the image. Verify that it's there. Then, we need to authenticate Docker to ECR using the commands listed in the notes. Now we need to tag our image and push it to the ECR. I was running into an issue with the docker push command. It wasn't finishing the push to the ECR. I was missing the `sudo` on the docker login command so I had to change that. Silly mistakes!
+
+Lets create our custom namespace for this challenge. We'll name it `tc2`. Then, we'll create out helm chart. This will generate all the sub-directories we need for our Helm deployment. We'll need to alter some of these files. We'll be altering our Charts.yaml and values.yaml files. We'll remove our tests directory and our httproute.yaml file. I ran into an error message with the values.yaml file. There were a few parts where I left the {} brackets where I added values. I had to remove the brackets since I believe that denotes an empty space. 
+
+Then I ran into an issue with the Charts.yaml file. Apparently Helm didn't like that we still had the NOTES.txt file. I removed it. There was so much troubleshooting after this. I don't even remember each part. We'll just have to go back over this section but we finally got it to work. 
+
+UPDATE: Okay the issue with the port was that my app was listening on port 5000 but in the deployment.yaml file, the variable that the values.yaml file passed it was the service.port. That service-port was automatically set to port 80. So w needed to go into the deployment.yaml file and change it to the containerPort variable. I set that value to 5000 in the values.yaml file. We figured this out because the probes were trying to get to the localhost on port 80. This caused K8s to kill and restart the container (CrashLoopBackOff). 
+
+In order to push to my GitHub repo from my EC2 instance, I had to generate a fine-used token with the permissions of Content for Read & Write. That was also a quick headache. Had to side-step that. 
+
+Clarification notes:
+
+A service account gives a workload running inside Kubernetes an identity. Think of it like a non-human admin. It's assuming an IAM role. The annotate command added metadata to the service account. It tells EKS that the pods using this service account should be allowed to assume this AWS IAM role. This allows EKS to inject AWS role (and token information) into the Pod.
+
+The rollout command waits for the deployment to finish. I guess it's kind of like a status loading bar. It actively waits until it's done rolling out. 
+
+A helm repo contains specific Helm charts and an index (manual) describing the available charts and versions. We needed this for the AWS EKS repo for the AWS load balancer controller. The charts are templates that create these types of services so that's why we have to install these repos. You don't want to create these deployment.yaml files from scratch, right? Then use the repo and the charts. 
+
+`kube-system` is a namespace. It's reservered for cluster-level system components created by K8s or installed to operate the cluster. So the big ones like Cluster DNS, metrics, load balancer automation, node autoscaling, etc support the entire system. Your hello cruel world application is just one part of the system so it should be in another namespace. 
+
+
+10/8/2026
+
+So, we'll start by deploying our Terraform infrastructure again. We'll validate that both the cluster and worker nodes have been created. I'll include the `aws eks` commands in the notes. We're going to use the Jenkins server as the mgmt jumpbox as well to run all of our commands. When you log into your Jenkins server, run `aws sts get-caller-identity` to make sure you have the proper privileges. You can install all the CLIs afterwards. I ran the `describe-nodegroup` command and received an unauthorized error message. We needed to update the permissions on our Jenkins server IAM role. I saved those changes. When then ran into a time-out issue when retrieving the pods and nodes. The traffic from the Jenkins server to the EKS API was being blocked. We needed to create an ingress rule on port 443 from the Jenkins server to the EKS automatically created SG. I added this block to the security.tf file in Terraform. Once I deployed, we were able to confirm the proper pods (aws-node-lb, two coredns pods, and kube-proxy). Now we're cooking
+
+Lets create the Metrics Server. I put all the commands in the notes. You should be able to see the metrics of the pods and nodes if you use the `kubectl top` command. The rollout command ********************** . Now, lets create the AWS Load Balancer. We need to install it and then verify it. It will watch the K9s Ingress and then provision an AWS Application Load Balancer. I put all the commands in the notes as well as there are a lot of them. Once you verify with the get deployment and get pods commands, we can move onto the Autoscaler. We did run into a few IAM issues when it came to retrieving basic AWS information so I also updated the iam.tf file for TF. 
+
+Lets do the Autoscaler. I have all the commands listed in the notes as well since there are A LOT. After everything was said and done, we ran into two failures regarding the Autoscaler missing the AWS region. We're going to fix that. We need to redeploy our `helm (upgrade) cluster-autoscaler` command and hardcode our region and cloud provider for some reason. Once we did that, our error messages cleared. We ran our last checks with out get commands and verified everything is up and running! That completes this phase. 
+
+10/07/2026
+
+- Install Metrics Server
+- AWS Load Balancer Controller
+- Cluster Autoscaler

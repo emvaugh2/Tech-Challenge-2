@@ -19,6 +19,7 @@ git init
 git branch -M main
 git remote add origin https://github.com/emvaugh2/Tech-Challenge-2.git
 
+############################## Phase 3 ############################
 
 # Packages to install on Jenkins server/mgmt jumpbox
 sudo dnf install -y git
