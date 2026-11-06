@@ -38,7 +38,7 @@ In a second terminal onthe EC2 instance, perform a curl test on the local machin
 ![Displays success message in sepearate terminal](pictures/Phase1/tc2phase1pic4.png)
 
 
-If you go back to the first termainl, you'll also see the GET request posted to your script. That verifies that the script is functioning as intended!
+If you go back to the first terminal, you'll also see the GET request posted to your script. That verifies that the script is functioning as intended!
 
 ![Verifies GET request in first terminal](pictures/Phase1/tc2phase1pic5.png)
 
